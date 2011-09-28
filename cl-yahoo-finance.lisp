@@ -13,7 +13,7 @@
 (ql:quickload :cl-csv)
 (ql:quickload :drakma)
 (ql:quickload :babel)
-(asdf:load-system :batteries)
+
 (defparameter columns
   '((ask . "a")
     (average_daily_volume . "a2")
@@ -109,33 +109,70 @@
     (monthly . "m")
     (dividends_only . "v")))
 
+;; Misc utility routines
+(defun concat-list(seq)
+  "Concatenates a list of strings"
+  (reduce #'(lambda (r s)
+	      (concatenate 'string r s))
+	  seq))
+
 (defun pairup (s u)
   (loop for var-s in s 
        for var-u in  u
        collect (cons var-s var-u)))
        
+(defun to-s (thing)
+  (format nil "~a" thing))
        
-
-(defun read-current-symbols (symbol-string ) 
-  (let ((columnlist (batteries:concat-list 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-current-symbol (symbol-list ) 
+  (let ((columnlist (concat-list 
 		     (mapcar #'(lambda (pair) 
 				 (cdr pair)) 
 			     columns)))
 	(columnnames (mapcar #'(lambda (pair) 
 				 (car pair)) 
-			     columns)))
-    (let ((csv (car (cl-csv:read-csv 
-		(babel:octets-to-string 
-		 (drakma:http-request
-		  (concatenate 'string
-			       "http://finance.yahoo.com/d/quotes.csv?s="  
-			       symbol-string
-			       "&f="
-			       columnlist "&e=.csv")))))))
-      ;;only 1 row returned.... for now.
-      (pairup columnnames csv))))
+			     columns))
+	;; join
+	(gathered-symbol-list (reduce 
+			       #'(lambda (a b) 
+				   (concatenate 'string a "+" b))
+			       symbol-list)))
+    (let ((rows 
+	    (cl-csv:read-csv 
+	     (babel:octets-to-string 
+	      (drakma:http-request
+	       (concatenate 'string
+			    "http://finance.yahoo.com/d/quotes.csv?s="  
+			    gathered-symbol-list
+			    "&f="
+			    columnlist "&e=.csv"))))))
+      (loop for row in rows 
+	   collect (pairup columnnames row)))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
-;    url = "http://ichart.finance.yahoo.com/table.csv?s=#{URI.escape(symbol)}&d=#{end_date.month-1}&e=#{end_date.day}&f=#{end_date.year}&g=#{HISTORICAL_MODES[options[:period]]}&a=#{start_date.month-1}&b=#{start_date.day}&c=#{start_date.year}&ignore=.csv"
+(defun read-historical-data (symbol-string start-date end-date)
+  "Start and end dates are 3-element lists mm/dd/yy "
+  (drakma:http-request
+   (concatenate 'string
+		"http://ichart.finance.yahoo.com/table.csv?s="
+		symbol-string
+		"&d="
+		(to-s (1- (first end-date)))
+		"&e="
+		(to-s (second end-date))
+		"&f="
+		(to-s (third end-date))
+		"&g="
+		(cdr (assoc 'daily historical-modes))
+		"&a="
+		(to-s (1- (first start-date)))
+		"&b="
+		(to-s (second start-date))
+		"&c="
+		(to-s (third start-date))
+		"&ignore=.csv")))
 
 
