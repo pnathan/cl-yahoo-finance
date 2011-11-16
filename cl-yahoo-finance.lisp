@@ -14,6 +14,8 @@
 (ql:quickload :drakma)
 (ql:quickload :babel)
 
+;; column-name . yahoo-identifier
+;; yahoo uses these identifiers as ways to parse out meaning. 
 (defparameter columns
   '((ask . "a")
     (average_daily_volume . "a2")
@@ -103,6 +105,7 @@
     (dividend_yield . "y")))
     ;(adjusted_close . nil))) ; this one only comes in historical quotes
 
+;; modes of operation
 (defparameter historical-modes 
   '((daily . "d")
     (weekly ."w")
@@ -117,11 +120,14 @@
 	  seq))
 
 (defun pairup (s u)
+  "s u => ((s1 . u1) (s2 . u2) ... )"
   (loop for var-s in s 
        for var-u in  u
        collect (cons var-s var-u)))
        
+;; less typing
 (defun to-s (thing)
+  "Converts thing to a string using FORMAT"
   (format nil "~a" thing))
        
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -133,7 +139,7 @@
 	(columnnames (mapcar #'(lambda (pair) 
 				 (car pair)) 
 			     columns))
-	;; join
+	;; join on + since that's how we form a request
 	(gathered-symbol-list (reduce 
 			       #'(lambda (a b) 
 				   (concatenate 'string a "+" b))
