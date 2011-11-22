@@ -145,6 +145,7 @@
        
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-symbols (symbol-list) 
+  "Pass in a list of symbols in strings; get a list of a-lists out"
   (let ((columnlist (concat-list 
 		     (mapcar #'(lambda (pair) 
 				 (cdr pair)) 
