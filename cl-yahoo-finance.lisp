@@ -1,13 +1,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; cl-yahoo-finance
-;;;; Obtainsyahoo finance information and presents the information as a hash table.
+;;;; Obtains yahoo's finance information and presents the information as a hash table.
 ;;;; author: Paul Nathan
-;;;; Licence LLGPl
+;;;;
+;;;; Licence LLGPL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 (defpackage :cl-yahoo-finance
-  (:use :common-lisp))
+  (:use :common-lisp)
+  (:export
+   :read-current-symbols
+   :read-historical-data))
 (in-package :cl-yahoo-finance)
 
 (ql:quickload :cl-csv)
@@ -92,7 +96,7 @@
     (shares_owned . "s1")
     (short_ratio . "s7")
     (last_trade_time . "t1")
-    ;;(trade_links . "t6")          ;; Horked up the parsing
+    ;;(trade_links . "t6")          ;; Horks up the parsing
     (ticker_trend . "t7")
     (one_year_target_price . "t8")
     (volume . "v")
@@ -102,7 +106,8 @@
     (day_value_change . "w1")
     (day_value_change_realtime . "w4")
     (stock_exchange . "x")
-    (dividend_yield . "y")))
+    (dividend_yield . "y"))
+  "This a-list serves as keys for the Yahoo stock information for a given quote")
     ;(adjusted_close . nil))) ; this one only comes in historical quotes
 
 ;; modes of operation
@@ -110,7 +115,8 @@
   '((daily . "d")
     (weekly ."w")
     (monthly . "m")
-    (dividends_only . "v")))
+    (dividends_only . "v"))
+  "Keys into historical quotes")
 
 ;; Misc utility routines
 (defun concat-list(seq)
@@ -131,7 +137,7 @@
   (format nil "~a" thing))
        
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun read-current-symbol (symbol-list ) 
+(defun read-current-symbols (symbol-list) 
   (let ((columnlist (concat-list 
 		     (mapcar #'(lambda (pair) 
 				 (cdr pair)) 
@@ -180,5 +186,3 @@
 		"&c="
 		(to-s (third start-date))
 		"&ignore=.csv")))
-
-
