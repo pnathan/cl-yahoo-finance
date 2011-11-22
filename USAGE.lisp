@@ -1,3 +1,6 @@
+;;; This is how to use cl-yahoo-finance.
+
+
 ;; Load me up
 (asdf:load-system :cl-yahoo-finance)
 

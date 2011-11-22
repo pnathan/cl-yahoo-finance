@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; cl-yahoo-finance
-;;;; Obtains yahoo's finance information and presents the information as a hash table.
+;;;; Obtains Yahoo's finance information and presents the information as a hash table.
 ;;;; author: Paul Nathan
 ;;;;
 ;;;; Licence LLGPL
@@ -18,6 +18,7 @@
 (ql:quickload :drakma)
 (ql:quickload :babel)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; column-name . yahoo-identifier
 ;; yahoo uses these identifiers as ways to parse out meaning. 
 (defparameter columns
@@ -110,6 +111,7 @@
   "This a-list serves as keys for the Yahoo stock information for a given quote")
     ;(adjusted_close . nil))) ; this one only comes in historical quotes
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
 (defparameter historical-modes 
   '((daily . "d")
@@ -118,22 +120,27 @@
     (dividends_only . "v"))
   "Keys into historical quotes")
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc utility routines
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun concat-list(seq)
   "Concatenates a list of strings"
   (reduce #'(lambda (r s)
 	      (concatenate 'string r s))
 	  seq))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun pairup (s u)
   "s u => ((s1 . u1) (s2 . u2) ... )"
   (loop for var-s in s 
        for var-u in  u
        collect (cons var-s var-u)))
        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; less typing
 (defun to-s (thing)
-  "Converts thing to a string using FORMAT"
+  "Converts `thing` to a string using FORMAT"
   (format nil "~a" thing))
        
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
