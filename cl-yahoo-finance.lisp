@@ -166,23 +166,29 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
 (defun read-historical-data (symbol-string start-date end-date)
-  "Start and end dates are 3-element lists mm/dd/yy "
-  (drakma:http-request
-   (concatenate 'string
-		"http://ichart.finance.yahoo.com/table.csv?s="
-		symbol-string
-		"&d="
-		(to-s (1- (first end-date)))
-		"&e="
-		(to-s (second end-date))
-		"&f="
-		(to-s (third end-date))
-		"&g="
-		(cdr (assoc 'daily historical-modes))
-		"&a="
-		(to-s (1- (first start-date)))
-		"&b="
-		(to-s (second start-date))
-		"&c="
-		(to-s (third start-date))
-		"&ignore=.csv")))
+  "Start and end dates are 3-element lists mm/dd/yy 
+Returns a list of lists, ie, csv. Headers are, in order:
+Date Open High Low Close Volume Adj Close"
+  (let ((rows
+	 (cl-csv:read-csv
+	  ;(babel:octets-to-string
+	   (drakma:http-request
+	    (concatenate 'string
+			 "http://ichart.finance.yahoo.com/table.csv?s="
+			 symbol-string
+			 "&d="
+			 (to-s (1- (first end-date)))
+			 "&e="
+			 (to-s (second end-date))
+			 "&f="
+			 (to-s (third end-date))
+			 "&g="
+			 (cdr (assoc 'daily historical-modes))
+			 "&a="
+			 (to-s (1- (first start-date)))
+			 "&b="
+			 (to-s (second start-date))
+			 "&c="
+			 (to-s (third start-date))
+			 "&ignore=.csv")))))
+    rows))	
