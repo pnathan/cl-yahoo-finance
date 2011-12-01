@@ -6,6 +6,9 @@
 ;;;; Licence LLGPL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20yahoo.finance.quotes%20where%20symbol%20in%20(%22IBM%22)%0A&format=json&diagnostics=true&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys&callback=cbfunc
+
+;; http://developer.yahoo.com/yql/guide/running-chapt.html
 
 (defpackage :cl-yahoo-finance
   (:use :common-lisp)
@@ -14,14 +17,10 @@
    :read-historical-data))
 (in-package :cl-yahoo-finance)
 
-(ql:quickload :cl-csv)
-(ql:quickload :drakma)
-(ql:quickload :babel)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; column-name . yahoo-identifier
 ;; yahoo uses these identifiers as ways to parse out meaning. 
-(defparameter columns
+(defparameter *columns*
   '((ask . "a")
     (average_daily_volume . "a2")
     (ask_size . "a5")
@@ -111,6 +110,19 @@
   "This a-list serves as keys for the Yahoo stock information for a given quote")
     ;(adjusted_close . nil))) ; this one only comes in historical quotes
 
+
+;;concatenated symbols
+(defparameter *columnlist*
+  (concat-list 
+   (mapcar #'cdr  
+	   *columns*)))
+
+(defparameter *columnnames*
+  (mapcar #'car 
+	  *columns*))
+
+
+(length *columns*)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
 (defparameter historical-modes 
@@ -129,13 +141,6 @@
   (reduce #'(lambda (r s)
 	      (concatenate 'string r s))
 	  seq))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun pairup (s u)
-  "s u => ((s1 . u1) (s2 . u2) ... )"
-  (loop for var-s in s 
-       for var-u in  u
-       collect (cons var-s var-u)))
        
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; less typing
@@ -143,30 +148,34 @@
   "Converts `thing` to a string using FORMAT"
   (format nil "~a" thing))
        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun pairup (s u)
+  "s u => ((s1 . u1) (s2 . u2) ... )"
+  (loop for var-s in s 
+       for var-u in  u
+       collect (cons var-s var-u)))
+
+(defun build-yahoo-query (symbol-list)
+  (concatenate 'string
+	       "http://finance.yahoo.com/d/quotes.csv?s="  
+	       symbol-list
+	       "&f="
+	       *columnlist*
+	       "&e=.csv"))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-symbols (symbol-list) 
   "Pass in a list of symbols in strings; get a list of a-lists out"
-  (let ((columnlist (concat-list 
-		     (mapcar #'(lambda (pair) 
-				 (cdr pair)) 
-			     columns)))
-	(columnnames (mapcar #'(lambda (pair) 
-				 (car pair)) 
-			     columns))
 	;; join on + since that's how we form a request
-	(gathered-symbol-list (reduce 
+  (let ((gathered-symbol-list (reduce 
 			       #'(lambda (a b) 
 				   (concatenate 'string a "+" b))
 			       symbol-list)))
     (let ((rows 
-	    (cl-csv:read-csv 
-	     (babel:octets-to-string 
-	      (drakma:http-request
-	       (concatenate 'string
-			    "http://finance.yahoo.com/d/quotes.csv?s="  
-			    gathered-symbol-list
-			    "&f="
-			    columnlist "&e=.csv"))))))
+	   (cl-csv:read-csv 
+	    (babel:octets-to-string 
+	     (drakma:http-request
+	      (build-yahoo-query gathered-symbol-list ))))))
       (loop for row in rows 
 	   collect (pairup columnnames row)))))
 

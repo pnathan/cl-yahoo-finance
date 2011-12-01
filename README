@@ -4,12 +4,13 @@ Author: Paul Nathan, 2011
 Licence: LLGPL
 
 TODO: 
-* Clean up the table.csv data
+* Clean up the csv data returned by Yahoo
 ** Destring stringifed data
-** Convert N/A to Nil
-** Sanitize HTML tags floating around
+** Remove fields that are not easily repairable
+** Convert N/A results to Nil
+** clean out the HTML tags floating around
 
-* Add documentation
+* Add public docs
 
 Contributions welcome.
 
