@@ -4,16 +4,13 @@ Author: Paul Nathan, 2011
 Licence: LLGPL
 
 TODO: 
-* Clean up the csv data returned by Yahoo
+* Clean up the data returned by Yahoo
 ** Destring stringifed data
-** Remove fields that are not easily repairable
 ** Convert N/A results to Nil
 ** clean out the HTML tags floating around
-
-* Add public docs
 
 Contributions welcome.
 
 Attributions:
 
-Approach & constants observed from https://github.com/herval/yahoo-finance
+Historical data retrieval observed at https://github.com/herval/yahoo-finance

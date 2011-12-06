@@ -2,210 +2,143 @@
 ;;;; cl-yahoo-finance
 ;;;; Obtains Yahoo's finance information and presents the information as a hash table.
 ;;;; author: Paul Nathan
-;;;;
 ;;;; Licence LLGPL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20yahoo.finance.quotes%20where%20symbol%20in%20(%22IBM%22)%0A&format=json&diagnostics=true&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys&callback=cbfunc
-
-;; http://developer.yahoo.com/yql/guide/running-chapt.html
 
 (defpackage :cl-yahoo-finance
   (:use :common-lisp)
   (:export
-   :read-current-symbols
+   :read-current-data
    :read-historical-data))
 (in-package :cl-yahoo-finance)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; column-name . yahoo-identifier
-;; yahoo uses these identifiers as ways to parse out meaning. 
-(defparameter *columns*
-  '((ask . "a")
-    (average_daily_volume . "a2")
-    (ask_size . "a5")
-    (bid . "b")
-    (ask_real_time . "b2")
-    (bid_real_time . "b3")
-    (book_value . "b4")
-    (bid_size . "b6")
-    (chance_and_percent_change . "c")
-    (change . "c1")
-    (comission . "c3")
-    (change_real_time . "c6")
-    (after_hours_change_real_time . "c8")
-    (dividend_per_share . "d")
-    (last_trade_date . "d1")
-    (trade_date . "d2")
-    (earnings_per_share . "e")
-    (error_indicator . "e1")
-    (eps_estimate_current_year . "e7")
-    (eps_estimate_next_year . "e8")
-    (eps_estimate_next_quarter . "e9") 
-    (float_shares . "f6") 
-    (low . "g")
-    (high . "h")
-    (low_52_weeks . "j")
-    (high_52_weeks . "k")
-    (holdings_gain_percent . "g1")
-    (annualized_gain . "g3")
-    (holdings_gain . "g4")
-    (holdings_gain_percent_realtime . "g5")
-    (holdings_gain_realtime . "g6")
-    (more_info . "i")
-    (order_book . "i5") 
-    (market_capitalization . "j1")
-    (market_cap_realtime . "j3") 
-    (ebitda . "j4")
-    (change_From_52_week_low . "j5")
-    (percent_change_from_52_week_low . "j6")
-    (last_trade_realtime_withtime . "k1")
-    (change_percent_realtime . "k2")
-    (last_trade_size . "k3")
-    (change_from_52_week_high . "k4")
-    (percent_change_from_52_week_high . "k5")
-    (last_trade_with_time . "l")
-    (last_trade_price . "l1")
-    (close . "l1")
-    (high_limit . "l2")
-    (low_limit . "l3")
-    (days_range . "m")
-    (days_range_realtime . "m2")
-    (moving_average_50_day . "m3")
-    (moving_average_200_day . "m4")
-    (change_from_200_day_moving_average . "m5")
-    (percent_change_from_200_day_moving_average . "m6")
-    (change_from_50_day_moving_average . "m7")
-    (percent_change_from_50_day_moving_average . "m8")
-    (name . "n")
-    (notes . "n4")
-    (open . "o")
-    (previous_close . "p")
-    (price_paid . "p1")
-    (change_in_percent . "p2")
-    (price_per_sales . "p5")
-    (price_per_book . "p6")
-    (ex_dividend_date . "q")
-    (pe_ratio . "p5")
-    (dividend_pay_date . "r1")
-    (pe_ratio_realtime . "r2")
-    (peg_ratio . "r5")
-    (price_eps_estimate_current_year . "r6")
-    (price_eps_Estimate_next_year . "r7")
-    (symbol . "s")
-    (shares_owned . "s1")
-    (short_ratio . "s7")
-    (last_trade_time . "t1")
-    ;;(trade_links . "t6")          ;; Horks up the parsing
-    (ticker_trend . "t7")
-    (one_year_target_price . "t8")
-    (volume . "v")
-    (holdings_value . "v1")
-    (holdings_value_realtime . "v7")
-    (weeks_range_52 . "w")
-    (day_value_change . "w1")
-    (day_value_change_realtime . "w4")
-    (stock_exchange . "x")
-    (dividend_yield . "y"))
-  "This a-list serves as keys for the Yahoo stock information for a given quote")
-    ;(adjusted_close . nil))) ; this one only comes in historical quotes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;; Misc utility routines
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun concat-list(seq)
+  "Concatenates a list of strings"
+  (reduce #'(lambda (r s)
+	      (concatenate 'string r s))
+	  seq))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; less typing
+(defun to-s (thing)
+  "Converts `thing` to a string using FORMAT"
+  (format nil "~a" thing))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun strcat (&rest strings)
+  (reduce #'(lambda (a b)
+	    (concatenate 'string a b))
+	  strings))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun enquote-string (string)
+  "Surround `string` with double-quotes, suitable for passing to other
+systems."
+  (strcat
+   "\"" string "\""))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun ensure-list (thing)
+  "Ensures that `thing` is a list. If it is an atom, it is wrapped in
+a list"
+  (if (not (listp thing))
+      (list thing)
+      thing))
+	   	   
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun request-yql-stock-info (symbol-list)
+  (let ((quoted-symbols
+	 (reduce #'(lambda (a b)	;join
+		     (strcat a  ", " b))
+		 (mapcar #'enquote-string
+			 symbol-list))))
+    (babel:octets-to-string
+     (drakma:http-request
+      (strcat
+       "http://query.yahooapis.com/v1/public/yql?q="
+       (url-rewrite:url-encode
+	(strcat
+	 "select * from yahoo.finance.quotes where symbol in ("
+	 quoted-symbols
+	 ")"))
+       "&format=json&diagnostics=true&env=store://datatables.org/alltableswithkeys"))
+     )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun yason-stock-quotes-parse (quote-string)
+  (gethash
+   "quote"
+   (gethash
+    "results"
+    (gethash
+     "query"
+     (yason:parse quote-string)))))
 
 
-;;concatenated symbols
-(defparameter *columnlist*
-  (concat-list 
-   (mapcar #'cdr  
-	   *columns*)))
-
-(defparameter *columnnames*
-  (mapcar #'car 
-	  *columns*))
-
-
-(length *columns*)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
-(defparameter historical-modes 
+(defparameter historical-modes
   '((daily . "d")
     (weekly ."w")
     (monthly . "m")
     (dividends_only . "v"))
   "Keys into historical quotes")
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Misc utility routines
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun concat-list(seq)
-  "Concatenates a list of strings"
-  (reduce #'(lambda (r s)
-	      (concatenate 'string r s))
-	  seq))
-       
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; less typing
-(defun to-s (thing)
-  "Converts `thing` to a string using FORMAT"
-  (format nil "~a" thing))
-       
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun pairup (s u)
-  "s u => ((s1 . u1) (s2 . u2) ... )"
-  (loop for var-s in s 
-       for var-u in  u
-       collect (cons var-s var-u)))
-
-(defun build-yahoo-query (symbol-list)
-  (concatenate 'string
-	       "http://finance.yahoo.com/d/quotes.csv?s="  
-	       symbol-list
-	       "&f="
-	       *columnlist*
-	       "&e=.csv"))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Mooched from Ram Krishnan's public post on
+;; lispservice.posterous.com
+(defun safely-read-from-string (str &rest read-from-string-args)
+  "Read an expression from the string STR, with *READ-EVAL* set to
+NIL. Any unsafe expressions will be replaced by NIL in the resulting
+S-Expression."
+  (let ((*read-eval* nil))
+    (ignore-errors
+      (apply 'read-from-string str read-from-string-args))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun read-current-symbols (symbol-list) 
-  "Pass in a list of symbols in strings; get a list of a-lists out"
-	;; join on + since that's how we form a request
-  (let ((gathered-symbol-list (reduce 
-			       #'(lambda (a b) 
-				   (concatenate 'string a "+" b))
-			       symbol-list)))
-    (let ((rows 
-	   (cl-csv:read-csv 
-	    (babel:octets-to-string 
-	     (drakma:http-request
-	      (build-yahoo-query gathered-symbol-list ))))))
-      (loop for row in rows 
-	   collect (pairup columnnames row)))))
-
+;;; Exported functions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-current-data (symbol-list)
+  "Returns a list of hash tables"
+  (let ((list-of-symbols (ensure-list symbol-list)))
+     (ensure-list
+      (yason-stock-quotes-parse
+       (request-yql-stock-info list-of-symbols)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
 (defun read-historical-data (symbol-string start-date end-date)
-  "Start and end dates are 3-element lists mm/dd/yy 
+  "Start and end dates are 3-element lists mm/dd/yy
 Returns a list of lists, ie, csv. Headers are, in order:
 Date Open High Low Close Volume Adj Close"
   (let ((rows
 	 (cl-csv:read-csv
-	  ;(babel:octets-to-string
 	   (drakma:http-request
-	    (concatenate 'string
-			 "http://ichart.finance.yahoo.com/table.csv?s="
-			 symbol-string
-			 "&d="
-			 (to-s (1- (first end-date)))
-			 "&e="
-			 (to-s (second end-date))
-			 "&f="
-			 (to-s (third end-date))
-			 "&g="
-			 (cdr (assoc 'daily historical-modes))
-			 "&a="
-			 (to-s (1- (first start-date)))
-			 "&b="
-			 (to-s (second start-date))
-			 "&c="
-			 (to-s (third start-date))
-			 "&ignore=.csv")))))
-    rows))	
+	    (strcat
+	     "http://ichart.finance.yahoo.com/table.csv?s="
+	     symbol-string
+	     "&d="
+	     (to-s (1- (first end-date)))
+	     "&e="
+	     (to-s (second end-date))
+	     "&f="
+	     (to-s (third end-date))
+	     "&g="
+	     (cdr (assoc 'daily historical-modes))
+	     "&a="
+	     (to-s (1- (first start-date)))
+	     "&b="
+	     (to-s (second start-date))
+	     "&c="
+	     (to-s (third start-date))
+	     "&ignore=.csv")))))
+    ;;Parse the numbers
+    (loop for row in rows
+       collect
+	 (cons (car row) 
+	       (mapcar #'safely-read-from-string
+		       (rest row))))))
