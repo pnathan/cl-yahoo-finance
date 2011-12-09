@@ -30,9 +30,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun strcat (&rest strings)
-  (reduce #'(lambda (a b)
-	    (concatenate 'string a b))
-	  strings))
+  (apply 'concatenate 'string strings))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun enquote-string (string)
@@ -52,8 +51,7 @@ a list"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun request-yql-stock-info (symbol-list)
   (let ((quoted-symbols
-	 (reduce #'(lambda (a b)	;join
-		     (strcat a  ", " b))
+	 (format nil "~{~A~^, ~}"  ;join
 		 (mapcar #'enquote-string
 			 symbol-list))))
     (babel:octets-to-string
@@ -81,7 +79,7 @@ a list"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
-(defparameter historical-modes
+(defparameter *historical-modes*
   '((daily . "d")
     (weekly ."w")
     (monthly . "m")
@@ -115,30 +113,37 @@ S-Expression."
   "Start and end dates are 3-element lists mm/dd/yy
 Returns a list of lists, ie, csv. Headers are, in order:
 Date Open High Low Close Volume Adj Close"
-  (let ((rows
-	 (cl-csv:read-csv
-	   (drakma:http-request
-	    (strcat
-	     "http://ichart.finance.yahoo.com/table.csv?s="
-	     symbol-string
-	     "&d="
-	     (to-s (1- (first end-date)))
-	     "&e="
-	     (to-s (second end-date))
-	     "&f="
-	     (to-s (third end-date))
-	     "&g="
-	     (cdr (assoc 'daily historical-modes))
-	     "&a="
-	     (to-s (1- (first start-date)))
-	     "&b="
-	     (to-s (second start-date))
-	     "&c="
-	     (to-s (third start-date))
-	     "&ignore=.csv")))))
-    ;;Parse the numbers
-    (loop for row in rows
-       collect
-	 (cons (car row) 
-	       (mapcar #'safely-read-from-string
-		       (rest row))))))
+  (labels ((month (date-list) (1- (first date-list)))
+	   (day (date-list)   (second date-list))
+	   (year (date-list)  (third date-list)))
+
+    (let* ((request-params
+	    ;;Params specified by Yahoo...
+	    '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
+	   (param-values
+	    (mapcar 
+	     #'to-s
+	     (list
+	      symbol-string
+	      (month end-date)
+	      (day end-date)
+	      (year end-date)
+	      (cdr (assoc 'daily *historical-modes*))
+	      (month start-date)
+	      (day start-date)
+	      (year start-date)
+	      ".csv")))
+	   (rows
+	    (cl-csv:read-csv
+	     (drakma:http-request
+	      "http://ichart.finance.yahoo.com/table.csv"
+	      :parameters
+	      (pairlis 
+	       request-params
+	       param-values)))))
+      ;;Parse the numbers
+      (loop for row in rows
+	 collect
+	   (cons (car row) 
+		 (mapcar #'safely-read-from-string
+			 (rest row)))))))
