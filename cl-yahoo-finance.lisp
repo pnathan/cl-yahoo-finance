@@ -9,7 +9,8 @@
   (:use :common-lisp)
   (:export
    :read-current-data
-   :read-historical-data))
+   :read-historical-data
+   :read-historical-splits))
 (in-package :cl-yahoo-finance)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
@@ -80,10 +81,10 @@ a list"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
 (defparameter *historical-modes*
-  '((daily . "d")
-    (weekly ."w")
-    (monthly . "m")
-    (dividends_only . "v"))
+  '(("daily" . "d")
+    ("weekly" ."w")
+    ("monthly" . "m")
+    ("dividends_only" . "v"))
   "Keys into historical quotes")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -97,6 +98,16 @@ S-Expression."
     (ignore-errors
       (apply 'read-from-string str read-from-string-args))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; read the ratio for split to lisp ratio
+;; (example, 3:1 as 3/1)
+(defun read-ratio-to-lisp (str)
+  (let ((pos (position #\: str)))
+   (if pos
+    (replace str "/" :start1 pos :end1 (+ 1 pos))))
+  (safely-read-from-string str))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Exported functions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -109,41 +120,83 @@ S-Expression."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
-(defun read-historical-data (symbol-string start-date end-date)
+(defun read-historical-data (symbol-string start-date end-date &optional (historical-type "daily"))
   "Start and end dates are 3-element lists mm/dd/yy
-Returns a list of lists, ie, csv. Headers are, in order:
-Date Open High Low Close Volume Adj Close"
+  Returns a list of lists, ie, csv. Headers are, in order:
+  Date Open High Low Close Volume Adj Close"
   (labels ((month (date-list) (1- (first date-list)))
-	   (day (date-list)   (second date-list))
-	   (year (date-list)  (third date-list)))
+           (day (date-list)   (second date-list))
+           (year (date-list)  (third date-list)))
 
     (let* ((request-params
-	    ;;Params specified by Yahoo...
-	    '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
-	   (param-values
-	    (mapcar 
-	     #'to-s
-	     (list
-	      symbol-string
-	      (month end-date)
-	      (day end-date)
-	      (year end-date)
-	      (cdr (assoc 'daily *historical-modes*))
-	      (month start-date)
-	      (day start-date)
-	      (year start-date)
-	      ".csv")))
-	   (rows
-	    (cl-csv:read-csv
-	     (drakma:http-request
-	      "http://ichart.finance.yahoo.com/table.csv"
-	      :parameters
-	      (pairlis 
-	       request-params
-	       param-values)))))
+             ;;Params specified by Yahoo...
+             '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
+           (param-values
+             (mapcar 
+               #'to-s
+               (list
+                 symbol-string
+                 (month end-date)
+                 (day end-date)
+                 (year end-date)
+                 (cdr (assoc historical-type *historical-modes* :test #'string-equal))
+                 (month start-date)
+                 (day start-date)
+                 (year start-date)
+                 ".csv")))
+           (rows
+             (cl-csv:read-csv
+               (drakma:http-request
+                 "http://ichart.finance.yahoo.com/table.csv"
+                 :parameters
+                 (pairlis 
+                   request-params
+                   param-values)))))
       ;;Parse the numbers
-      (loop for row in rows
-	 collect
-	   (cons (car row) 
-		 (mapcar #'safely-read-from-string
-			 (rest row)))))))
+      (append (list (first rows))
+              (loop for row in (rest rows)
+                    collect
+                    (cons (car row) 
+                          (mapcar #'safely-read-from-string
+                                  (rest row))))))))
+
+(defun read-historical-splits (symbol-string start-date end-date)
+  "Start and end dates are 3-element lists mm/dd/yy
+  Returns a list of lists, ie, csv. Headers are, in order:
+  Date Split"
+  (labels ((month (date-list) (1- (first date-list)))
+           (day (date-list)   (second date-list))
+           (year (date-list)  (third date-list)))
+
+    (let* ((request-params
+             ;;Params specified by Yahoo...
+             '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
+           (param-values
+             (mapcar 
+               #'to-s
+               (list
+                 symbol-string
+                 (month end-date)
+                 (day end-date)
+                 (year end-date)
+                 "v"
+                 (month start-date)
+                 (day start-date)
+                 (year start-date)
+                 ".csv")))
+           (rows
+             (cl-csv:read-csv
+               (drakma:http-request
+                 "http://ichart.finance.yahoo.com/x"
+                 :parameters
+                 (pairlis 
+                   request-params
+                   param-values)))))
+      ;;Parse the numbers
+      (append '(("Date" "Split"))
+            (delete nil
+                    (loop for row in rows
+                          collect
+                          (if (string-equal (first row) "SPLIT")
+                           (list (concatenate 'string (subseq (second row) 0 4) "-" (subseq (second row) 4 6) "-" (subseq (second row) 6)) (read-ratio-to-lisp (third row)))
+                            nil)))))))
