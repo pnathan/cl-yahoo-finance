@@ -9,3 +9,6 @@
 
 ;; Get the historical data from TSLA
 (cl-yahoo-finance:read-historical-data "TSLA" '(1 1 2011) '(6 1 2011))
+
+;; Get historical splits for GE
+(cl-yahoo-finance:read-historical-splits "GE" '(1 1 1990) '(1 1 2012))
