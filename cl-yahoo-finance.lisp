@@ -36,7 +36,6 @@
 (defun strcat (&rest strings)
   (apply 'concatenate 'string strings))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun enquote-string (string)
   "Surround `string` with double-quotes, suitable for passing to other
@@ -54,6 +53,8 @@ a list"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun request-yql-stock-info (symbol-list)
+  "Calls out to the YQL online API to get info on the list of stock
+symbols"
   (let ((quoted-symbols
 	 (format nil "~{~A~^, ~}"  ;join
 		 (mapcar #'enquote-string
@@ -67,11 +68,12 @@ a list"
 	 "select * from yahoo.finance.quotes where symbol in ("
 	 quoted-symbols
 	 ")"))
-       "&format=json&diagnostics=true&env=store://datatables.org/alltableswithkeys"))
-     )))
+       "&format=json&diagnostics=true&env=store://datatables.org/alltableswithkeys")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun yason-stock-quotes-parse (quote-string)
+  "Reads a JSON string assumed to be Yahoo data and returns a
+hash-table of its data"
   (gethash
    "quote"
    (gethash
@@ -201,9 +203,9 @@ S-Expression."
                     (loop for row in rows
                           collect
                           (if (string-equal (first row) "SPLIT")
-                           (list (concatenate 'string
-					      (subseq (second row) 0 4) "-"
-					      (subseq (second row) 4 6) "-"
-					      (subseq (second row) 6))
-				 (read-ratio-to-lisp (third row)))
-                            nil)))))))
+			      (list (concatenate 'string
+						 (subseq (second row) 0 4) "-"
+						 (subseq (second row) 4 6) "-"
+						 (subseq (second row) 6))
+				    (read-ratio-to-lisp (third row)))
+			      nil)))))))
