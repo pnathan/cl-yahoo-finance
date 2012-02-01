@@ -13,7 +13,10 @@
    :read-historical-splits))
 (in-package :cl-yahoo-finance)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;; TODOs
+;; Refactor read-historical-*
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc utility routines
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -48,7 +51,7 @@ a list"
   (if (not (listp thing))
       (list thing)
       thing))
-	   	   
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun request-yql-stock-info (symbol-list)
   (let ((quoted-symbols
@@ -132,7 +135,7 @@ S-Expression."
              ;;Params specified by Yahoo...
              '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
            (param-values
-             (mapcar 
+             (mapcar
                #'to-s
                (list
                  symbol-string
@@ -149,14 +152,14 @@ S-Expression."
                (drakma:http-request
                  "http://ichart.finance.yahoo.com/table.csv"
                  :parameters
-                 (pairlis 
+                 (pairlis
                    request-params
                    param-values)))))
       ;;Parse the numbers
       (append (list (first rows))
               (loop for row in (rest rows)
                     collect
-                    (cons (car row) 
+                    (cons (car row)
                           (mapcar #'safely-read-from-string
                                   (rest row))))))))
 
@@ -172,7 +175,7 @@ S-Expression."
              ;;Params specified by Yahoo...
              '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
            (param-values
-             (mapcar 
+             (mapcar
                #'to-s
                (list
                  symbol-string
@@ -189,7 +192,7 @@ S-Expression."
                (drakma:http-request
                  "http://ichart.finance.yahoo.com/x"
                  :parameters
-                 (pairlis 
+                 (pairlis
                    request-params
                    param-values)))))
       ;;Parse the numbers
@@ -198,5 +201,9 @@ S-Expression."
                     (loop for row in rows
                           collect
                           (if (string-equal (first row) "SPLIT")
-                           (list (concatenate 'string (subseq (second row) 0 4) "-" (subseq (second row) 4 6) "-" (subseq (second row) 6)) (read-ratio-to-lisp (third row)))
+                           (list (concatenate 'string
+					      (subseq (second row) 0 4) "-"
+					      (subseq (second row) 4 6) "-"
+					      (subseq (second row) 6))
+				 (read-ratio-to-lisp (third row)))
                             nil)))))))
