@@ -10,11 +10,10 @@
   (:export
    :read-current-data
    :read-historical-data
-   :read-historical-splits))
+   :read-historical-splits
+   :*proxy*
+   :with-proxy))
 (in-package :cl-yahoo-finance)
-
-;; TODOs
-;; Refactor read-historical-*
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc utility routines
@@ -68,7 +67,8 @@ symbols"
 	 "select * from yahoo.finance.quotes where symbol in ("
 	 quoted-symbols
 	 ")"))
-       "&format=json&diagnostics=true&env=store://datatables.org/alltableswithkeys")))))
+       "&format=json&diagnostics=true&env=store://datatables.org/alltableswithkeys")
+      :proxy *proxy*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun yason-stock-quotes-parse (quote-string)
@@ -82,14 +82,13 @@ hash-table of its data"
      "query"
      (yason:parse quote-string)))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
 (defparameter *historical-modes*
-  '(("daily" . "d")
-    ("weekly" ."w")
-    ("monthly" . "m")
-    ("dividends_only" . "v"))
+  '((daily . "d")
+    (weekly ."w")
+    (monthly . "m")
+    (dividends_only . "v"))
   "Keys into historical quotes")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -103,6 +102,37 @@ S-Expression."
     (ignore-errors
       (apply 'read-from-string str read-from-string-args))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun request-csv-historical-stock (symbol-string url historical-type start-date end-date)
+  "Core reading function for reading historical data"
+  (labels ((month (date-list) (1- (first date-list)))
+           (day (date-list)   (second date-list))
+           (year (date-list)  (third date-list)))
+    (let ((request-params
+	   ;;Params specified by Yahoo...
+	   '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
+	  (param-values
+	   (mapcar
+	    #'to-s
+	    (list
+	     symbol-string
+	     (month end-date)
+	     (day end-date)
+	     (year end-date)
+	     (cdr (assoc historical-type *historical-modes*))
+	     (month start-date)
+	     (day start-date)
+	     (year start-date)
+	     ".csv"))))
+
+      (cl-csv:read-csv
+       (drakma:http-request
+	url
+	:parameters
+	(pairlis
+	 request-params
+	 param-values)
+	:proxy *proxy*)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; read the ratio for split to lisp ratio
@@ -116,7 +146,24 @@ S-Expression."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Exported functions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun read-current-data (symbol-list)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Proxy management.
+
+(defparameter *proxy*
+  nil
+  "HTTP proxy: Takes nil, address as string, or list containing
+address as string and port as integer")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmacro with-proxy ((proxy-value) &body body)
+  "Binds `proxy-value` to *proxy* for the duration of the macro"
+  `(let ((*proxy* ,proxy-value))
+     (progn
+       ,@body)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-current-data (symbol-list &key ((proxy *proxy*) *proxy*))
   "Returns a list of hash tables"
   (let ((list-of-symbols (ensure-list symbol-list)))
      (ensure-list
@@ -125,87 +172,60 @@ S-Expression."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
-(defun read-historical-data (symbol-string start-date end-date &optional (historical-type "daily"))
+(defun read-historical-data (symbol-string start-date end-date
+			     &key
+			     (historical-type 'daily)
+			     ((proxy *proxy*) *proxy*))
+
   "Start and end dates are 3-element lists mm/dd/yy
   Returns a list of lists, ie, csv. Headers are, in order:
   Date Open High Low Close Volume Adj Close"
-  (labels ((month (date-list) (1- (first date-list)))
-           (day (date-list)   (second date-list))
-           (year (date-list)  (third date-list)))
+  (let ((rows
+	 (request-csv-historical-stock
+	  symbol-string
+	  "http://ichart.finance.yahoo.com/table.csv"
+	  historical-type
+	  start-date end-date)))
 
-    (let* ((request-params
-             ;;Params specified by Yahoo...
-             '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
-           (param-values
-             (mapcar
-               #'to-s
-               (list
-                 symbol-string
-                 (month end-date)
-                 (day end-date)
-                 (year end-date)
-                 (cdr (assoc historical-type *historical-modes* :test #'string-equal))
-                 (month start-date)
-                 (day start-date)
-                 (year start-date)
-                 ".csv")))
-           (rows
-             (cl-csv:read-csv
-               (drakma:http-request
-                 "http://ichart.finance.yahoo.com/table.csv"
-                 :parameters
-                 (pairlis
-                   request-params
-                   param-values)))))
-      ;;Parse the numbers
-      (append (list (first rows))
-              (loop for row in (rest rows)
-                    collect
-                    (cons (car row)
-                          (mapcar #'safely-read-from-string
-                                  (rest row))))))))
+    (append (list (first rows))
+	    (loop for row in (rest rows)
+	       collect
+		 (cons (car row)
+		       (mapcar #'safely-read-from-string
+			       (rest row)))))))
 
-(defun read-historical-splits (symbol-string start-date end-date)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-historical-splits (symbol-string start-date end-date
+			       &key
+			       ((proxy *proxy*) *proxy*))
   "Start and end dates are 3-element lists mm/dd/yy
   Returns a list of lists, ie, csv. Headers are, in order:
   Date Split"
-  (labels ((month (date-list) (1- (first date-list)))
-           (day (date-list)   (second date-list))
-           (year (date-list)  (third date-list)))
+  (let ((rows
+	 (request-csv-historical-stock
+	  symbol-string
+	  "http://ichart.finance.yahoo.com/x"
+	  'dividends_only
+	  start-date end-date)))
 
-    (let* ((request-params
-             ;;Params specified by Yahoo...
-             '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
-           (param-values
-             (mapcar
-               #'to-s
-               (list
-                 symbol-string
-                 (month end-date)
-                 (day end-date)
-                 (year end-date)
-                 "v"
-                 (month start-date)
-                 (day start-date)
-                 (year start-date)
-                 ".csv")))
-           (rows
-             (cl-csv:read-csv
-               (drakma:http-request
-                 "http://ichart.finance.yahoo.com/x"
-                 :parameters
-                 (pairlis
-                   request-params
-                   param-values)))))
-      ;;Parse the numbers
-      (append '(("Date" "Split"))
-            (delete nil
-                    (loop for row in rows
-                          collect
-                          (if (string-equal (first row) "SPLIT")
-			      (list (concatenate 'string
-						 (subseq (second row) 0 4) "-"
-						 (subseq (second row) 4 6) "-"
-						 (subseq (second row) 6))
-				    (read-ratio-to-lisp (third row)))
-			      nil)))))))
+    (append '(("Date" "Split"))
+	    (delete
+	     nil
+	     (loop for row in rows
+		collect
+		  (when (string-equal (first row) "SPLIT")
+		    (list
+		     (format nil "~{~A~}"
+			     (list
+			      (subseq (second row) 0 4) "-"
+			      (subseq (second row) 4 6) "-"
+			      (subseq (second row) 6)))
+		     (read-ratio-to-lisp (third row)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Kick these for a test
+;;(cl-yahoo-finance:read-historical-data "GOOG"  '(1 1 2009) '(1 1 2010) :historical-type 'daily)
+;;(cl-yahoo-finance:read-historical-data "GOOG"  '(1 1 2009) '(1 1 2010) :historical-type 'weekly)
+;;(cl-yahoo-finance:read-historical-data "GOOG"  '(1 1 2009) '(1 1 2010) :historical-type 'monthly)
+;;(cl-yahoo-finance:read-historical-data "IBM"  '(1 1 2009) '(1 1 2010) :historical-type 'dividends_only)
+;;(cl-yahoo-finance:read-historical-splits "SLV"  '(1 1 1960) '(1 1 2012))
