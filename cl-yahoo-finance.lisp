@@ -4,6 +4,9 @@
 ;;;; author: Paul Nathan
 ;;;; Licence LLGPL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TODO: Find the profit % and numbers for the most recent quarter and
+;; return that in read-current-company-info
+
 
 (defpackage :cl-yahoo-finance
   (:use :common-lisp)
@@ -11,6 +14,7 @@
    :read-current-data
    :read-historical-data
    :read-historical-splits
+   :read-current-company-info
    :*proxy*
    :with-proxy))
 (in-package :cl-yahoo-finance)
@@ -59,7 +63,7 @@ a list"
       thing))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun request-yql-stock-info (symbol-list)
+(defun request-yql-info (table symbol-list)
   "Calls out to the YQL online API to get info on the list of stock
 symbols"
   (let ((quoted-symbols
@@ -70,19 +74,30 @@ symbols"
      (drakma:http-request
       "http://query.yahooapis.com/v1/public/yql"
       :parameters
-      (list*  
+      (list*
        (cons "q" (strcat
-		  "select * from yahoo.finance.quotes where symbol in ("
+		  "select * from "
+		  table
+		  " where symbol in ("
 		  quoted-symbols ")"))
        '(("format" . "json")
-	 ("diagnostics" . "true")
+	 ("diagnostics" . "false")
 	 ("env" . "store://datatables.org/alltableswithkeys")))
       :proxy *proxy*))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun request-yql-stock-info (symbol-list)
+  (request-yql-info "yahoo.finance.quotes" symbol-list))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun request-yql-quant-info (symbol-list)
+  (request-yql-info "yahoo.finance.quant" symbol-list))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun yason-stock-quotes-parse (quote-string)
-  "Reads a JSON string assumed to be Yahoo data and returns a
-hash-table of its data"
+  "Reads a JSON string assumed to be Yahoo stock information and
+returns a hash-table of its data"
   (gethash
    "quote"
    (gethash
@@ -90,6 +105,13 @@ hash-table of its data"
     (gethash
      "query"
      (yason:parse quote-string)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun yason-quant-parse (data-string)
+  "Reads a JSON string assumed to be data from Yahoo.finance.quant and
+returns a hash-table of its data. \"TwoMonthsAgo\" is known to map to
+a HTML string sometimes."
+  (gethash "stock" (gethash "results" (gethash "query"  (yason:parse data-string)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
@@ -176,8 +198,10 @@ S-Expression."
 (defun read-current-company-info (symbol-list
 				  &key ((proxy *proxy*) *proxy*))
   "Reads the current company info and returns it as an a-list"
-
-  )
+  (let ((list-of-symbols (ensure-list symbol-list)))
+    (ensure-list
+     (yason-quant-parse
+      (request-yql-quant-info list-of-symbols)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
@@ -239,3 +263,4 @@ S-Expression."
 ;;(cl-yahoo-finance:read-historical-data "IBM"  '(1 1 2009) '(1 1 2010) :historical-type 'dividends_only)
 ;;(cl-yahoo-finance:read-historical-splits "SLV"  '(1 1 1960) '(1 1 2012))
 ;;(cl-yahoo-finance:read-current-data '("GOOG"))
+;;(cl-yahoo-finance:read-current-company-info '("GOOG" "V" "SLCA"))
