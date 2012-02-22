@@ -170,6 +170,12 @@ address as string and port as integer")
       (yason-stock-quotes-parse
        (request-yql-stock-info list-of-symbols)))))
 
+(defun read-current-company-info (symbol-list
+				  &key ((proxy *proxy*) *proxy*))
+  "Reads the current company info and returns it as an a-list"
+
+  )
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
 (defun read-historical-data (symbol-string start-date end-date
