@@ -16,6 +16,14 @@
 (in-package :cl-yahoo-finance)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Proxy Variable
+
+(defparameter *proxy*
+  nil
+  "HTTP proxy: Takes nil, address as string, or list containing
+address as string and port as integer")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc utility routines
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -55,19 +63,20 @@ a list"
   "Calls out to the YQL online API to get info on the list of stock
 symbols"
   (let ((quoted-symbols
-	 (format nil "~{~A~^, ~}"  ;join
+	 (format nil "~{~A~^,~}"  ;join
 		 (mapcar #'enquote-string
 			 symbol-list))))
     (babel:octets-to-string
      (drakma:http-request
-      (strcat
-       "http://query.yahooapis.com/v1/public/yql?q="
-       (url-rewrite:url-encode
-	(strcat
-	 "select * from yahoo.finance.quotes where symbol in ("
-	 quoted-symbols
-	 ")"))
-       "&format=json&diagnostics=true&env=store://datatables.org/alltableswithkeys")
+      "http://query.yahooapis.com/v1/public/yql"
+      :parameters
+      (list*  
+       (cons "q" (strcat
+		  "select * from yahoo.finance.quotes where symbol in ("
+		  quoted-symbols ")"))
+       '(("format" . "json")
+	 ("diagnostics" . "true")
+	 ("env" . "store://datatables.org/alltableswithkeys")))
       :proxy *proxy*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -150,12 +159,6 @@ S-Expression."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Proxy management.
 
-(defparameter *proxy*
-  nil
-  "HTTP proxy: Takes nil, address as string, or list containing
-address as string and port as integer")
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmacro with-proxy ((proxy-value) &body body)
   "Binds `proxy-value` to *proxy* for the duration of the macro"
   `(let ((*proxy* ,proxy-value))
@@ -229,3 +232,4 @@ address as string and port as integer")
 ;;(cl-yahoo-finance:read-historical-data "GOOG"  '(1 1 2009) '(1 1 2010) :historical-type 'monthly)
 ;;(cl-yahoo-finance:read-historical-data "IBM"  '(1 1 2009) '(1 1 2010) :historical-type 'dividends_only)
 ;;(cl-yahoo-finance:read-historical-splits "SLV"  '(1 1 1960) '(1 1 2012))
+;;(cl-yahoo-finance:read-current-data '("GOOG"))
