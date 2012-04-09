@@ -116,10 +116,10 @@ a HTML string sometimes."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
 (defparameter *historical-modes*
-  '((daily . "d")
-    (weekly ."w")
-    (monthly . "m")
-    (dividends_only . "v"))
+  '((:daily . "d")
+    (:weekly ."w")
+    (:monthly . "m")
+    (:dividends_only . "v"))
   "Keys into historical quotes")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -207,7 +207,7 @@ S-Expression."
 ;Historical data URL
 (defun read-historical-data (symbol-string start-date end-date
 			     &key
-			     (historical-type 'daily)
+			     (historical-type :daily)
 			     ((proxy *proxy*) *proxy*))
 
   "Start and end dates are 3-element lists mm/dd/yy
