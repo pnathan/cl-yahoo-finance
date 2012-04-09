@@ -1,9 +1,14 @@
-Common Lisp library for accessing Yahoo Finance quotes. 
+Common Lisp library for accessing Yahoo Finance quotes.
 
-Author: Paul Nathan, 2011
+Authors: Paul Nathan
+Contributors: Chris Howey, riktam
 Licence: LLGPL
 
-TODO: 
+Documentation available at:
+
+https://github.com/pnathan/cl-yahoo-finance/wiki
+
+TODO:
 * Clean up the data returned by Yahoo
 ** Destring stringifed data
 ** Convert N/A results to Nil
