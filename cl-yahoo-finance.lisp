@@ -238,7 +238,7 @@ S-Expression."
 	 (request-csv-historical-stock
 	  symbol-string
 	  "http://ichart.finance.yahoo.com/x"
-	  'dividends_only
+	  :dividends_only
 	  start-date end-date)))
 
     (append '(("Date" "Split"))
