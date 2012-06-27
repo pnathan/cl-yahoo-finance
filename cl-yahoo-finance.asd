@@ -2,7 +2,7 @@
   :depends-on ( #:drakma #:babel #:cl-csv #:yason #:url-rewrite)
   :components ((:file "cl-yahoo-finance"))
   :name "cl-yahoo-finance"
-  :version "3.2"
+  :version "3.3"
   :maintainer "Paul Nathan"
   :author "Paul Nathan"
   :licence "LLGPL"

@@ -11,6 +11,7 @@
 (defpackage :cl-yahoo-finance
   (:use :common-lisp)
   (:export
+   :read-current-options
    :read-current-data
    :read-historical-data
    :read-historical-splits
@@ -86,6 +87,9 @@ symbols"
       :proxy *proxy*))))
 
 
+(defun request-yql-options-info (symbol-list)
+  (request-yql-info "yahoo.finance.options" symbol-list))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun request-yql-stock-info (symbol-list)
   (request-yql-info "yahoo.finance.quotes" symbol-list))
@@ -93,6 +97,26 @@ symbols"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun request-yql-quant-info (symbol-list)
   (request-yql-info "yahoo.finance.quant" symbol-list))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun yason-stock-options-parse (quote-string)
+  "Reads a string assumed to be Yahoo Finance options tables.
+
+Returns a list of hash tables. Each hash table has keys \"symbol\"
+  and \"option\"
+
+symbol points out to the symbol desired;
+option points out a a hash table with the following keys
+
+openInt, vol, ask, bid, changeDir, change, lastPrice, strikePrice,
+type, symbol"
+
+  (ensure-list
+   (gethash
+    "optionsChain"
+    (gethash
+     "results"
+     (gethash "query" (yason:parse quote-string))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun yason-stock-quotes-parse (quote-string)
@@ -132,6 +156,8 @@ S-Expression."
   (let ((*read-eval* nil))
     (ignore-errors
       (apply 'read-from-string str read-from-string-args))))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun request-csv-historical-stock (symbol-string url historical-type start-date end-date)
@@ -202,6 +228,16 @@ S-Expression."
     (ensure-list
      (yason-quant-parse
       (request-yql-quant-info list-of-symbols)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-current-options (symbol-list &key ((proxy *proxy*) *proxy*))
+  "Takes one or more symbols and returns a list of option hash tables.
+
+See yason-stock-options-parse for details on the data structure."
+  (let ((list-of-symbols (ensure-list symbol-list)))
+    (yason-stock-options-parse
+     (request-yql-options-info list-of-symbols))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
