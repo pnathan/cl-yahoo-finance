@@ -13,6 +13,7 @@
   (:export
    :read-current-options
    :read-current-data
+   :read-current-data-from-csv
    :read-historical-data
    :read-historical-splits
    :read-current-company-info
@@ -27,6 +28,12 @@
   nil
   "HTTP proxy: Takes nil, address as string, or list containing
 address as string and port as integer")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defparameter *debug*
+  nil
+  "Debugging parameter. Don't set it unless you're digging around")
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc utility routines
@@ -71,6 +78,10 @@ symbols"
 	 (format nil "~{~A~^,~}"  ;join
 		 (mapcar #'enquote-string
 			 symbol-list))))
+;;http://query.yahooapis.com/v1/public/yql
+;; ?q=select%20*%20from%20yahoo.finance.quotes%20where%20symbol%20in%20(%22YHOO%22%2C%22AAPL%22%2C%22GOOG%22%2C%22MSFT%22)&
+;; diagnostics=true
+;; &env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys
     (babel:octets-to-string
      (drakma:http-request
       "http://query.yahooapis.com/v1/public/yql"
@@ -82,7 +93,7 @@ symbols"
 		  " where symbol in ("
 		  quoted-symbols ")"))
        '(("format" . "json")
-	 ("diagnostics" . "false")
+	 ("diagnostics" . "true")
 	 ("env" . "store://datatables.org/alltableswithkeys")))
       :proxy *proxy*))))
 
@@ -300,3 +311,146 @@ See yason-stock-options-parse for details on the data structure."
 ;;(cl-yahoo-finance:read-historical-splits "SLV"  '(1 1 1960) '(1 1 2012))
 ;;(cl-yahoo-finance:read-current-data '("GOOG"))
 ;;(cl-yahoo-finance:read-current-company-info '("GOOG" "V" "SLCA"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; hacks because the stock price YQL system seems overloaded.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; column-name . yahoo-identifier
+;; yahoo uses these identifiers as ways to parse out meaning.
+(defparameter *columns*
+  '((:ask . "a")
+    ;(average_daily_volume . "a2")
+    ;(ask_size . "a5")
+    (:bid . "b")
+    ;(ask_real_time . "b2")
+    ;(bid_real_time . "b3")
+    ;(book_value . "b4")
+    ;(bid_size . "b6")
+    ;(chance_and_percent_change . "c")
+    (:change . "c1")
+    ;(comission . "c3")
+    ;(change_real_time . "c6")
+    ;(after_hours_change_real_time . "c8")
+    (:dividend_per_share . "d")
+    ;(last_trade_date . "d1")
+    ;(trade_date . "d2")
+    (:earnings_per_share . "e")
+    ;(error_indicator . "e1")
+    ;(eps_estimate_current_year . "e7")
+    ;(eps_estimate_next_year . "e8")
+    (:eps_estimate_next_quarter . "e9")
+    ;(float_shares . "f6")
+    (:low . "g")
+    (:high . "h")
+    (:low_52_weeks . "j")
+    (:high_52_weeks . "k")
+    ;(holdings_gain_percent . "g1")
+    ;(annualized_gain . "g3")
+    ;(holdings_gain . "g4")
+    ;(holdings_gain_percent_realtime . "g5")
+    ;(holdings_gain_realtime . "g6")
+    ;(more_info . "i")
+    ;(order_book . "i5")
+    ;(market_capitalization . "j1")
+    ;(market_cap_realtime . "j3")
+    (:ebitda . "j4")
+    ;(change_From_52_week_low . "j5")
+    ;(percent_change_from_52_week_low . "j6")
+    ;(last_trade_realtime_withtime . "k1")
+    ;(change_percent_realtime . "k2")
+    ;(last_trade_size . "k3")
+    ;(change_from_52_week_high . "k4")
+    ;(percent_change_from_52_week_high . "k5")
+    ;(last_trade_with_time . "l")
+    ;(last_trade_price . "l1")
+    (:close . "l1")
+    ;(high_limit . "l2")
+    ;(low_limit . "l3")
+    ;(days_range . "m")
+    ;(days_range_realtime . "m2")
+    ;(moving_average_50_day . "m3")
+    ;(moving_average_200_day . "m4")
+    ;(change_from_200_day_moving_average . "m5")
+    ;(percent_change_from_200_day_moving_average . "m6")
+    ;(change_from_50_day_moving_average . "m7")
+    ;(percent_change_from_50_day_moving_average . "m8")
+    (:name . "n")
+    ;(notes . "n4")
+    (:open . "o")
+    (:previous_close . "p")
+    ;(price_paid . "p1")
+    ;(change_in_percent . "p2")
+    ;(price_per_sales . "p5")
+    ;(price_per_book . "p6")
+    ;(ex_dividend_date . "q")
+    (:pe_ratio . "p5")
+    ;(dividend_pay_date . "r1")
+    ;(pe_ratio_realtime . "r2")
+    (:peg_ratio . "r5")
+    ;(price_eps_estimate_current_year . "r6")
+    ;(price_eps_Estimate_next_year . "r7")
+    (:symbol . "s")
+    ;(shares_owned . "s1")
+    (:short_ratio . "s7")
+    ;(last_trade_time . "t1")
+    ;;(trade_links . "t6")          ;; Horks up the parsing
+    ;(ticker_trend . "t7")
+    ;(one_year_target_price . "t8")
+    (:volume . "v")
+    ;(holdings_value . "v1")
+    ;(holdings_value_realtime . "v7")
+    ;(weeks_range_52 . "w")
+    ;(day_value_change . "w1")
+    ;(day_value_change_realtime . "w4")
+    ;(stock_exchange . "x")
+    (:dividend_yield . "y"))
+  "This a-list serves as keys for the Yahoo stock information for a
+  given quote")
+    ;(adjusted_close . nil))) ; this one only comes in historical quotes
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun build-yahoo-query (symbol-list)
+  "Build the URL to get the info for `symbol-list`"
+  (flet ()
+
+    (let ((result
+            (format nil
+                    symbol-list
+                    (columnlist))))
+    (when *debug*
+      (format t "~a" result))
+      result)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-current-data-from-csv (symbol-or-symbol-list)
+  "Pass in a list of symbols in strings; get a list of a-lists out.
+Useful if YQL bails on us"
+
+  (when (listp symbol-or-symbol-list)
+    (error "Drakma and Yahoo don't want to talk if there are multiple
+    symbols in the list. I probably have to encode it more correctly"))
+
+  (flet ((columnnames ()
+           (mapcar #'car
+                   *columns*))
+         (columnlist ()
+           (format nil "~{~a~}"
+                   (mapcar #'cdr
+                           *columns*))))
+    (let*
+        ((symbol-list (ensure-list symbol-or-symbol-list))
+         (gathered-symbol-list (format nil "~{~a~^+~}" symbol-list))
+         (rows
+           (cl-csv:read-csv
+            (babel:octets-to-string
+             (drakma:http-request
+              "http://finance.yahoo.com/d/quotes.csv"
+              :method :get
+              :parameters
+              (list* (cons "s" gathered-symbol-list)
+                     (cons "f" (columnlist))
+                     '(("e" . ".csv"))))))))
+
+      ;; Create the alist(s)
+      (loop for row in rows
+            collect (pairlis (columnnames) row)))))
