@@ -133,13 +133,16 @@ type, symbol"
 (defun yason-stock-quotes-parse (quote-string)
   "Reads a JSON string assumed to be Yahoo stock information and
 returns a hash-table of its data"
-  (gethash
-   "quote"
-   (gethash
-    "results"
-    (gethash
-     "query"
-     (yason:parse quote-string)))))
+  (let ((results (gethash
+                  "quote"
+                  (gethash
+                   "results"
+                   (gethash
+                    "query"
+                    (yason:parse quote-string))))))
+    (if (listp results)
+        (map 'list #'parse-hashtable results)
+        (parse-hashtable results))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun yason-quant-parse (data-string)
@@ -408,6 +411,94 @@ See yason-stock-options-parse for details on the data structure."
   given quote")
     ;(adjusted_close . nil))) ; this one only comes in historical quotes
 
+
+(defparameter *float-columns*
+  '(:dividend_yield
+    :short_ratio
+    :peg_ratio
+    :pe_ratio
+    :previous_close
+    :previousclose
+    :open
+    :close
+    :high_52_weeks
+    :low_52_weeks
+    :high
+    :low
+    :eps_estimate_next_quarter
+    :earnings_per_share
+    :dividend_per_share
+    :change
+    :bid
+    :volume
+    :ask
+    :askrealtime
+    :bidrealtime
+    :dividendshare
+    :earningsshare
+    :fiftydaymovingaverage
+    :twohundreddaymovingaverage
+    :averagedailyvolume
+    :oneyrtargetprice
+    :pricesales
+    :prevousclose
+    :pricebook
+    :bookvalue
+    :pegratio
+    :priceepsestimatecurrentyear
+    :priceepsestimatenextyear
+    :epsestimatecurrentyear
+    :epsestimatenextyear
+    :epsestimatenextquarter
+    :epsestimatecurrentparter
+    :lasttradepriceonly
+    :changefromhigh
+    :changefromyearhigh
+    :dayslow
+    :dayshigh
+    :yearlow
+    :yearhigh
+    :changerealtime))
+
+(defun parse-float (string)
+  "Return a float read from string, and the index to the remainder of string."
+  (multiple-value-bind (integer i)
+      (parse-integer string :junk-allowed t)
+    (cond
+      ((or (<= (length string) i)
+           (not (eq #\. (aref string i))))
+       integer)
+      ((<=  (length string) (1+ i))
+       (coerce integer 'single-float))
+      (t
+       (multiple-value-bind (fraction j)
+           (parse-integer string :start (+ i 1) :junk-allowed t)
+         (values (float (+ integer (/ fraction (expt 10 (- j i 1))))) j))))))
+
+(defun parse-entry (name string-value)
+  "Convert the STRING-VALUE to a more helpful type.
+
+Returns (values NEW-VALUE converted-p).  The second value will be true
+if a conversion took place."
+  (cond
+    ((string= string-value "N/A")
+     (values nil t))
+    ((find name *float-columns*)
+     (values (parse-float string-value) t))
+    (t (values string-value nil))))
+
+(defun parse-hashtable (table)
+  "Clean and destringify entries in the hash table."
+  (let ((kw (find-package "KEYWORD")))
+    (maphash (lambda (k v)
+               (multiple-value-bind (new-val changed)
+                   (parse-entry (intern (string-upcase	k) kw)
+                                v)
+                 (when changed
+                   (setf (gethash k table) new-val))))
+             table)
+    table))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun build-yahoo-query (symbol-list)
   "Build the URL to get the info for `symbol-list`"
@@ -453,4 +544,6 @@ Useful if YQL bails on us"
 
       ;; Create the alist(s)
       (loop for row in rows
-            collect (pairlis (columnnames) row)))))
+            collect (map 'list (lambda (key value)
+                                 (cons key (parse-entry key value)))
+                         (columnnames) row)))))
