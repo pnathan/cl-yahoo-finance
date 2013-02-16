@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; cl-yahoo-finance
 ;;;; Obtains Yahoo's finance information and presents the information as a hash table.
-;;;; author: Paul Nathan
+;;;; Maintainer: Paul Nathan
 ;;;; Licence LLGPL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TODO: Find the profit % and numbers for the most recent quarter and
@@ -320,7 +320,7 @@ See yason-stock-options-parse for details on the data structure."
 ;;(cl-yahoo-finance:read-current-data '("GOOG"))
 ;;(cl-yahoo-finance:read-current-company-info '("GOOG" "V" "SLCA"))
 
-;;; maps the yason over to the intern keywords
+;;; maps the yason over to the intern keywordsq
 (defparameter +string-to-keyword-map+
   (pairlis
    '("PercentChange" "DividendYield" "StockExchange"
