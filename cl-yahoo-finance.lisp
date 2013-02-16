@@ -63,14 +63,6 @@ systems."
    "\"" string "\""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun ensure-list (thing)
-  "Ensures that `thing` is a list. If it is an atom, it is wrapped in
-a list"
-  (if (not (listp thing))
-      (list thing)
-      thing))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun request-yql-info (table symbol-list)
   "Calls out to the YQL online API to get info on the list of stock
 symbols"
@@ -122,7 +114,7 @@ option points out a a hash table with the following keys
 openInt, vol, ask, bid, changeDir, change, lastPrice, strikePrice,
 type, symbol"
 
-  (ensure-list
+  (alexandria:ensure-list
    (gethash
     "optionsChain"
     (gethash
@@ -230,16 +222,16 @@ S-Expression."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-data (symbol-list &key ((proxy *proxy*) *proxy*))
   "Returns a list of hash tables"
-  (let ((list-of-symbols (ensure-list symbol-list)))
-     (ensure-list
+  (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
+     (alexandria:ensure-list
       (yason-stock-quotes-parse
        (request-yql-stock-info list-of-symbols)))))
 
 (defun read-current-company-info (symbol-list
 				  &key ((proxy *proxy*) *proxy*))
   "Reads the current company info and returns it as an a-list"
-  (let ((list-of-symbols (ensure-list symbol-list)))
-    (ensure-list
+  (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
+    (alexandria:ensure-list
      (yason-quant-parse
       (request-yql-quant-info list-of-symbols)))))
 
@@ -249,7 +241,7 @@ S-Expression."
   "Takes one or more symbols and returns a list of option hash tables.
 
 See yason-stock-options-parse for details on the data structure."
-  (let ((list-of-symbols (ensure-list symbol-list)))
+  (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
     (yason-stock-options-parse
      (request-yql-options-info list-of-symbols))))
 
@@ -529,7 +521,7 @@ Useful if YQL bails on us"
                    (mapcar #'cdr
                            *columns*))))
     (let*
-        ((symbol-list (ensure-list symbol-or-symbol-list))
+        ((symbol-list (alexandria:ensure-list symbol-or-symbol-list))
          (gathered-symbol-list (format nil "~{~a~^+~}" symbol-list))
          (rows
            (cl-csv:read-csv
