@@ -50,6 +50,9 @@ address as string and port as integer")
 (defun to-s (thing)
   "Converts `thing` to a string using FORMAT"
   (format nil "~a" thing))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun getassoc (item alist &key key (test #'eql) )
+  (cdr (assoc item alist :key key :test test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun strcat (&rest strings)
@@ -124,7 +127,7 @@ type, symbol"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun yason-stock-quotes-parse (quote-string)
   "Reads a JSON string assumed to be Yahoo stock information and
-returns a hash-table of its data"
+returns an a-list of its data"
   (let ((results (gethash
                   "quote"
                   (gethash
@@ -220,6 +223,16 @@ S-Expression."
        ,@body)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun current-data-cleanse (hash-table)
+  (let ((newtable (make-hash-table :test #'equal)))
+    (loop for key in (alexandria:hash-table-keys hash-table) do
+      (setf (gethash (getassoc key +string-to-keyword-map+ :test #'string=)
+                     newtable)
+            (gethash key hash-table)))
+    newtable))
+
+
 (defun read-current-data (symbol-list &key ((proxy *proxy*) *proxy*))
   "Returns a list of hash tables"
   (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
@@ -306,6 +319,66 @@ See yason-stock-options-parse for details on the data structure."
 ;;(cl-yahoo-finance:read-historical-splits "SLV"  '(1 1 1960) '(1 1 2012))
 ;;(cl-yahoo-finance:read-current-data '("GOOG"))
 ;;(cl-yahoo-finance:read-current-company-info '("GOOG" "V" "SLCA"))
+
+;;; maps the yason over to the intern keywords
+(defparameter +string-to-keyword-map+
+  (pairlis
+   '("PercentChange" "DividendYield" "StockExchange"
+     "DaysValueChangeRealtime" "DaysValueChange" "YearRange"
+     "HoldingsValueRealtime" "HoldingsValue" "Volume" "OneyrTargetPrice"
+     "TickerTrend" "LastTradeTime" "ShortRatio" "SharesOwned" "Symbol"
+     "PriceEPSEstimateNextYear" "PriceEPSEstimateCurrentYear" "PEGRatio"
+     "PERatioRealtime" "DividendPayDate" "PERatio" "ExDividendDate"
+     "PriceBook" "PriceSales" "ChangeinPercent" "PricePaid" "PreviousClose"
+     "Open" "Notes" "Name" "PercentChangeFromFiftydayMovingAverage"
+     "ChangeFromFiftydayMovingAverage"
+     "PercentChangeFromTwoHundreddayMovingAverage"
+     "ChangeFromTwoHundreddayMovingAverage" "TwoHundreddayMovingAverage"
+     "FiftydayMovingAverage" "DaysRangeRealtime" "DaysRange" "LowLimit"
+     "HighLimit" "LastTradePriceOnly" "LastTradeWithTime"
+     "PercebtChangeFromYearHigh" "ChangeFromYearHigh"
+     "ChangePercentRealtime" "LastTradeRealtimeWithTime"
+     "PercentChangeFromYearLow" "ChangeFromYearLow" "EBITDA"
+     "MarketCapRealtime" "MarketCapitalization" "OrderBookRealtime"
+     "MoreInfo" "HoldingsGainRealtime" "HoldingsGainPercentRealtime"
+     "HoldingsGain" "AnnualizedGain" "HoldingsGainPercent" "YearHigh"
+     "YearLow" "DaysHigh" "DaysLow" "EPSEstimateNextQuarter"
+     "EPSEstimateNextYear" "EPSEstimateCurrentYear"
+     "ErrorIndicationreturnedforsymbolchangedinvalid" "EarningsShare"
+     "TradeDate" "LastTradeDate" "DividendShare" "AfterHoursChangeRealtime"
+     "ChangeRealtime" "Commission" "Change" "Change_PercentChange"
+     "BookValue" "BidRealtime" "AskRealtime" "Bid" "AverageDailyVolume"
+     "Ask" "symbol")
+   '(:percent-change :dividend-yield :stock-exchange
+     :days-value-change-realtime :days-value-change :year-range
+     :holdings-value-realtime :holdings-value :volume :one-yr-target-price
+     :ticker-trend :last-trade-time :short-ratio :shares-owned :symbol
+     :price-eps-estimate-next-year :price-epsestimate-current-year :peg-ratio
+     :pe-ratio-realtime :dividend-pay-date :pe-ratio :ex-dividend-date
+     :price-book :price-sales :change-in-percent :price-paid :previous-close
+     :open :notes :name :percent-change-from-fifty-day-moving-average
+     :change-from-fifty-day-moving-average
+     :percent-change-from-two-hundred-day-moving-average
+     :change-from-two-hundred-day-moving-average :two-hundredday-moving-average
+     :fiftyday-moving-average :days-range-realtime :days-range :low-limit
+     :high-limit :last-trade-price-only :last-trade-with-time
+     :percebt-change-from-year-high :change-from-year-high
+     :change-percent-realtime :last-trade-realtime-with-time
+     :percent-change-from-year-low :change-from-year-low :ebitda
+     :market-cap-realtime :market-capitalization :order-book-realtime
+     :more-info :holdings-gain-realtime :holdings-gain-percent-realtime
+     :holdings-gain :annualized-gain :holdings-gain-percent :year-high
+     :year-low :days-high :days-low
+     :eps-estimate-next-quarter
+     :eps-estimate-next-year :eps-estimate-current-year
+     :error-indication-returned-for-symbol-changed-invalid :earnings-share
+     :trade-date :last-trade-date :dividend-share :after-hours-change-realtime
+     :change-realtime :commission :change :change-percent-change :book-value
+     :bid-realtime :ask-realtime :bid :average-daily-volume :ask :symbol))
+  "A-list mapping the strings returned by the YASON into keywords")
+
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hacks because the stock price YQL system seems overloaded.
