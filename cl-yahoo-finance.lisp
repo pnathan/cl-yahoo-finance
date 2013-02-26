@@ -152,7 +152,12 @@ returns an a-list of its data"
   "Reads a JSON string assumed to be data from Yahoo.finance.quant and
 returns a hash-table of its data. \"TwoMonthsAgo\" is known to map to
 a HTML string sometimes."
-  (gethash "stock" (gethash "results" (gethash "query"  (yason:parse data-string)))))
+  (gethash
+   "stock"
+   (gethash
+    "results"
+    (gethash "query"
+	     (yason:parse data-string)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
@@ -231,6 +236,18 @@ S-Expression."
        ,@body)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Convert
+(defun convert-stringy-table-to-keyword (hash-table)
+  "Returns a new hash table with keywords as the keys instead of
+strings"
+  (let ((keys (alexandria:hash-table-keys hash-table))
+	(new-table (make-hash-table)))
+    (loop for key in keys
+	 do
+	 (setf (gethash (string-upcase key) new-table)
+	       (gethash key hash-table)))
+    new-table))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun current-data-cleanse (hash-table)
   (let ((newtable (make-hash-table :test #'equal)))
@@ -252,9 +269,11 @@ S-Expression."
 				  &key ((proxy *proxy*) *proxy*))
   "Reads the current company info and returns it as an a-list"
   (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
-    (alexandria:ensure-list
-     (yason-quant-parse
-      (request-yql-quant-info list-of-symbols)))))
+    (mapcar
+     #'convert-stringy-table-to-keyword
+     (alexandria:ensure-list
+      (yason-quant-parse
+       (request-yql-quant-info list-of-symbols))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
