@@ -69,6 +69,28 @@ address as string and port as integer")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Convert
+
+(defun convert-from-column-strings (dataset)
+  ;; first row indicates the keys
+  (let ((keys (mapcar
+	       #'(lambda (key)
+		   ;; TODO: factor this out.
+		   (intern
+		    (substitute-if
+		     #\-
+		     #'(lambda (c)
+			 (alexandria:switch
+			     (c :test #'char=)
+			   (#\Space t)))
+		     (string-upcase key))
+		    'keyword))
+	       (car dataset)))
+	(data (cdr dataset)))
+    (mapcar
+     #'(lambda (row)
+	 (alexandria:alist-hash-table (pairlis keys row)))
+     data)))
+
 (defun convert-stringy-table-to-keyword (hash-table)
   "Returns a new hash table with keywords as the keys instead of
 strings"
@@ -320,8 +342,8 @@ See yason-stock-options-parse for details on the data structure."
 			     ((proxy *proxy*) *proxy*))
 
   "Start and end dates are 3-element lists mm/dd/yy
-  Returns a list of lists, ie, csv. Headers are, in order:
-  Date Open High Low Close Volume Adj Close"
+  Returns a list of hash tables. Keys are:
+  Date Open High Low Close Volume Adj-Close"
   (let ((rows
 	 (request-csv-historical-stock
 	  symbol-string
@@ -329,19 +351,20 @@ See yason-stock-options-parse for details on the data structure."
 	  historical-type
 	  start-date end-date)))
 
-    (append (list (first rows))
-	    (loop for row in (rest rows)
-	       collect
-		 (cons (car row)
-		       (mapcar #'safely-read-from-string
-			       (rest row)))))))
+    (convert-from-column-strings
+     (append (list (first rows))
+	     (loop for row in (rest rows)
+		collect
+		  (cons (car row)
+			(mapcar #'safely-read-from-string
+				(rest row))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-historical-splits (symbol-string start-date end-date
 			       &key
 			       ((proxy *proxy*) *proxy*))
   "Start and end dates are 3-element lists mm/dd/yy
-  Returns a list of lists, ie, csv. Headers are, in order:
+  Returns a list of hash tables. Keys are:
   Date Split"
   (let ((rows
 	 (request-csv-historical-stock
@@ -350,19 +373,20 @@ See yason-stock-options-parse for details on the data structure."
 	  :dividends_only
 	  start-date end-date)))
 
-    (append '(("Date" "Split"))
-	    (delete
-	     nil
-	     (loop for row in rows
-		collect
-		  (when (string-equal (first row) "SPLIT")
-		    (list
-		     (format nil "~{~A~}"
-			     (list
-			      (subseq (second row) 0 4) "-"
-			      (subseq (second row) 4 6) "-"
-			      (subseq (second row) 6)))
-		     (read-ratio-to-lisp (third row)))))))))
+    (convert-from-column-strings
+     (append '(("Date" "Split"))
+	     (delete
+	      nil
+	      (loop for row in rows
+		 collect
+		   (when (string-equal (first row) "SPLIT")
+		     (list
+		      (format nil "~{~A~}"
+			      (list
+			       (subseq (second row) 0 4) "-"
+			       (subseq (second row) 4 6) "-"
+			       (subseq (second row) 6)))
+		      (read-ratio-to-lisp (third row))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Kick these for a test
