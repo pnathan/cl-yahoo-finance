@@ -1,19 +1,27 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; cl-yahoo-finance
-;;;; Obtains Yahoo's finance information and presents the information as a hash table.
+;;;;
+;;;; Obtains Yahoo's finance information and presents the information
+;;;; as a hash table.
+;;;;
 ;;;; Maintainer: Paul Nathan
 ;;;; Licence LLGPL
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; developer notes.
+;;
 ;; TODO: Find the profit % and numbers for the most recent quarter and
 ;; return that in read-current-company-info
+;;
+;; TODO: Normalize interfaces
 
 
 (defpackage :cl-yahoo-finance
   (:use :common-lisp)
   (:export
    :read-current-options
-   :read-current-data
-   :read-current-data-from-csv
+   :read-current-data			; this may not work
+   :read-current-data-from-csv		; this is the fallback
    :read-historical-data
    :read-historical-splits
    :read-current-company-info
