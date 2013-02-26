@@ -66,6 +66,21 @@ address as string and port as integer")
 (defun strcat (&rest strings)
   (apply 'concatenate 'string strings))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Convert
+(defun convert-stringy-table-to-keyword (hash-table)
+  "Returns a new hash table with keywords as the keys instead of
+strings"
+  (let ((keys (alexandria:hash-table-keys hash-table))
+	(new-table (make-hash-table)))
+    (loop for key in keys
+	 do
+	 (setf (gethash (intern (string-upcase key) 'keyword) new-table)
+	       (gethash key hash-table)))
+    new-table))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun enquote-string (string)
   "Surround `string` with double-quotes, suitable for passing to other
@@ -125,12 +140,36 @@ option points out a a hash table with the following keys
 openInt, vol, ask, bid, changeDir, change, lastPrice, strikePrice,
 type, symbol"
 
-  (alexandria:ensure-list
-   (gethash
-    "optionsChain"
-    (gethash
-     "results"
-     (gethash "query" (yason:parse quote-string))))))
+  (let ((return-table
+	 (alexandria:ensure-list
+	  (gethash
+	   "optionsChain"
+	   (gethash
+	    "results"
+	    (gethash
+	     "query"
+	     (yason:parse quote-string)))))))
+    ;; symbol => some-symbol
+    ;; option => ( hash-table-option ... )
+
+    ;; fixup the top-level keys
+    (let ((fixed-up-table-list
+	   (mapcar
+	    #'convert-stringy-table-to-keyword
+	    return-table)))
+
+      (mapcar
+       #'(lambda (fixed-up-table)
+	   ;; fixup the :option list
+	   (let ((chain
+		  (gethash :option fixed-up-table)))
+	     (setf (gethash :option fixed-up-table)
+		   (mapcar
+		    #'convert-stringy-table-to-keyword
+		    chain))
+	     fixed-up-table))
+
+       fixed-up-table-list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun yason-stock-quotes-parse (quote-string)
@@ -234,19 +273,6 @@ S-Expression."
   `(let ((*proxy* ,proxy-value))
      (progn
        ,@body)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Convert
-(defun convert-stringy-table-to-keyword (hash-table)
-  "Returns a new hash table with keywords as the keys instead of
-strings"
-  (let ((keys (alexandria:hash-table-keys hash-table))
-	(new-table (make-hash-table)))
-    (loop for key in keys
-	 do
-	 (setf (gethash (string-upcase key) new-table)
-	       (gethash key hash-table)))
-    new-table))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun current-data-cleanse (hash-table)
@@ -265,6 +291,7 @@ strings"
       (yason-stock-quotes-parse
        (request-yql-stock-info list-of-symbols)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-company-info (symbol-list
 				  &key ((proxy *proxy*) *proxy*))
   "Reads the current company info and returns it as an a-list"
