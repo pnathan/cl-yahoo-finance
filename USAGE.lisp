@@ -2,7 +2,7 @@
 
 
 ;; Load me up
-(asdf:load-system :cl-yahoo-finance)
+(ql:quickload :cl-yahoo-finance)
 
 ;; Pull in the complete details for the big G and big Blue
 (cl-yahoo-finance:read-current-data '("GOOG" "IBM"))
