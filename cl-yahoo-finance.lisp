@@ -20,8 +20,8 @@
   (:use :common-lisp)
   (:export
    :read-current-options
-   :read-current-data			; this may not work
-   :read-current-data-from-csv		; this is the fallback
+   :read-current-data                   ; this may not work
+   :read-current-data-from-csv          ; this is the fallback
    :read-historical-data
    :read-historical-splits
    :read-current-company-info
@@ -50,8 +50,8 @@ address as string and port as integer")
 (defun concat-list(seq)
   "Concatenates a list of strings"
   (reduce #'(lambda (r s)
-	      (concatenate 'string r s))
-	  seq))
+              (concatenate 'string r s))
+          seq))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; less typing
@@ -73,33 +73,33 @@ address as string and port as integer")
 (defun convert-from-column-strings (dataset)
   ;; first row indicates the keys
   (let ((keys (mapcar
-	       #'(lambda (key)
-		   ;; TODO: factor this out.
-		   (intern
-		    (substitute-if
-		     #\-
-		     #'(lambda (c)
-			 (alexandria:switch
-			     (c :test #'char=)
-			   (#\Space t)))
-		     (string-upcase key))
-		    'keyword))
-	       (car dataset)))
-	(data (cdr dataset)))
+               #'(lambda (key)
+                   ;; TODO: factor this out.
+                   (intern
+                    (substitute-if
+                     #\-
+                     #'(lambda (c)
+                         (alexandria:switch
+                             (c :test #'char=)
+                           (#\Space t)))
+                     (string-upcase key))
+                    'keyword))
+               (car dataset)))
+        (data (cdr dataset)))
     (mapcar
      #'(lambda (row)
-	 (alexandria:alist-hash-table (pairlis keys row)))
+         (alexandria:alist-hash-table (pairlis keys row)))
      data)))
 
 (defun convert-stringy-table-to-keyword (hash-table)
   "Returns a new hash table with keywords as the keys instead of
 strings"
   (let ((keys (alexandria:hash-table-keys hash-table))
-	(new-table (make-hash-table)))
+        (new-table (make-hash-table)))
     (loop for key in keys
-	 do
-	 (setf (gethash (intern (string-upcase key) 'keyword) new-table)
-	       (gethash key hash-table)))
+         do
+         (setf (gethash (intern (string-upcase key) 'keyword) new-table)
+               (gethash key hash-table)))
     new-table))
 
 
@@ -115,9 +115,9 @@ systems."
   "Calls out to the YQL online API to get info on the list of stock
 symbols"
   (let ((quoted-symbols
-	 (format nil "~{~A~^,~}"  ;join
-		 (mapcar #'enquote-string
-			 symbol-list))))
+         (format nil "~{~A~^,~}"  ;join
+                 (mapcar #'enquote-string
+                         symbol-list))))
 ;;http://query.yahooapis.com/v1/public/yql
 ;; ?q=select%20*%20from%20yahoo.finance.quotes%20where%20symbol%20in%20(%22YHOO%22%2C%22AAPL%22%2C%22GOOG%22%2C%22MSFT%22)&
 ;; diagnostics=true
@@ -128,13 +128,13 @@ symbols"
       :parameters
       (list*
        (cons "q" (strcat
-		  "select * from "
-		  table
-		  " where symbol in ("
-		  quoted-symbols ")"))
+                  "select * from "
+                  table
+                  " where symbol in ("
+                  quoted-symbols ")"))
        '(("format" . "json")
-	 ("diagnostics" . "true")
-	 ("env" . "store://datatables.org/alltableswithkeys")))
+         ("diagnostics" . "true")
+         ("env" . "store://datatables.org/alltableswithkeys")))
       :proxy *proxy*))))
 
 
@@ -163,33 +163,33 @@ openInt, vol, ask, bid, changeDir, change, lastPrice, strikePrice,
 type, symbol"
 
   (let ((return-table
-	 (alexandria:ensure-list
-	  (gethash
-	   "optionsChain"
-	   (gethash
-	    "results"
-	    (gethash
-	     "query"
-	     (yason:parse quote-string)))))))
+         (alexandria:ensure-list
+          (gethash
+           "optionsChain"
+           (gethash
+            "results"
+            (gethash
+             "query"
+             (yason:parse quote-string)))))))
     ;; symbol => some-symbol
     ;; option => ( hash-table-option ... )
 
     ;; fixup the top-level keys
     (let ((fixed-up-table-list
-	   (mapcar
-	    #'convert-stringy-table-to-keyword
-	    return-table)))
+           (mapcar
+            #'convert-stringy-table-to-keyword
+            return-table)))
 
       (mapcar
        #'(lambda (fixed-up-table)
-	   ;; fixup the :option list
-	   (let ((chain
-		  (gethash :option fixed-up-table)))
-	     (setf (gethash :option fixed-up-table)
-		   (mapcar
-		    #'convert-stringy-table-to-keyword
-		    chain))
-	     fixed-up-table))
+           ;; fixup the :option list
+           (let ((chain
+                  (gethash :option fixed-up-table)))
+             (setf (gethash :option fixed-up-table)
+                   (mapcar
+                    #'convert-stringy-table-to-keyword
+                    chain))
+             fixed-up-table))
 
        fixed-up-table-list))))
 
@@ -218,7 +218,7 @@ a HTML string sometimes."
    (gethash
     "results"
     (gethash "query"
-	     (yason:parse data-string)))))
+             (yason:parse data-string)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; modes of operation
@@ -249,30 +249,30 @@ S-Expression."
            (day (date-list)   (second date-list))
            (year (date-list)  (third date-list)))
     (let ((request-params
-	   ;;Params specified by Yahoo...
-	   '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
-	  (param-values
-	   (mapcar
-	    #'to-s
-	    (list
-	     symbol-string
-	     (month end-date)
-	     (day end-date)
-	     (year end-date)
-	     (cdr (assoc historical-type *historical-modes*))
-	     (month start-date)
-	     (day start-date)
-	     (year start-date)
-	     ".csv"))))
+           ;;Params specified by Yahoo...
+           '("s" "d" "e" "f" "g" "a" "b" "c" "ignore"))
+          (param-values
+           (mapcar
+            #'to-s
+            (list
+             symbol-string
+             (month end-date)
+             (day end-date)
+             (year end-date)
+             (cdr (assoc historical-type *historical-modes*))
+             (month start-date)
+             (day start-date)
+             (year start-date)
+             ".csv"))))
 
       (cl-csv:read-csv
        (drakma:http-request
-	url
-	:parameters
-	(pairlis
-	 request-params
-	 param-values)
-	:proxy *proxy*)))))
+        url
+        :parameters
+        (pairlis
+         request-params
+         param-values)
+        :proxy *proxy*)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; read the ratio for split to lisp ratio
@@ -315,7 +315,7 @@ S-Expression."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-company-info (symbol-list
-				  &key ((proxy *proxy*) *proxy*))
+                                  &key ((proxy *proxy*) *proxy*))
   "Reads the current company info and returns it as an a-list"
   (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
     (mapcar
@@ -337,56 +337,56 @@ See yason-stock-options-parse for details on the data structure."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
 (defun read-historical-data (symbol-string start-date end-date
-			     &key
-			     (historical-type :daily)
-			     ((proxy *proxy*) *proxy*))
+                             &key
+                             (historical-type :daily)
+                             ((proxy *proxy*) *proxy*))
 
   "Start and end dates are 3-element lists mm/dd/yy
   Returns a list of hash tables. Keys are:
   Date Open High Low Close Volume Adj-Close"
   (let ((rows
-	 (request-csv-historical-stock
-	  symbol-string
-	  "http://ichart.finance.yahoo.com/table.csv"
-	  historical-type
-	  start-date end-date)))
+         (request-csv-historical-stock
+          symbol-string
+          "http://ichart.finance.yahoo.com/table.csv"
+          historical-type
+          start-date end-date)))
 
     (convert-from-column-strings
      (append (list (first rows))
-	     (loop for row in (rest rows)
-		collect
-		  (cons (car row)
-			(mapcar #'safely-read-from-string
-				(rest row))))))))
+             (loop for row in (rest rows)
+                collect
+                  (cons (car row)
+                        (mapcar #'safely-read-from-string
+                                (rest row))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-historical-splits (symbol-string start-date end-date
-			       &key
-			       ((proxy *proxy*) *proxy*))
+                               &key
+                               ((proxy *proxy*) *proxy*))
   "Start and end dates are 3-element lists mm/dd/yy
   Returns a list of hash tables. Keys are:
   Date Split"
   (let ((rows
-	 (request-csv-historical-stock
-	  symbol-string
-	  "http://ichart.finance.yahoo.com/x"
-	  :dividends_only
-	  start-date end-date)))
+         (request-csv-historical-stock
+          symbol-string
+          "http://ichart.finance.yahoo.com/x"
+          :dividends_only
+          start-date end-date)))
 
     (convert-from-column-strings
      (append '(("Date" "Split"))
-	     (delete
-	      nil
-	      (loop for row in rows
-		 collect
-		   (when (string-equal (first row) "SPLIT")
-		     (list
-		      (format nil "~{~A~}"
-			      (list
-			       (subseq (second row) 0 4) "-"
-			       (subseq (second row) 4 6) "-"
-			       (subseq (second row) 6)))
-		      (read-ratio-to-lisp (third row))))))))))
+             (delete
+              nil
+              (loop for row in rows
+                 collect
+                   (when (string-equal (first row) "SPLIT")
+                     (list
+                      (format nil "~{~A~}"
+                              (list
+                               (subseq (second row) 0 4) "-"
+                               (subseq (second row) 4 6) "-"
+                               (subseq (second row) 6)))
+                      (read-ratio-to-lisp (third row))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Kick these for a test
@@ -635,7 +635,7 @@ if a conversion took place."
   (let ((kw (find-package "KEYWORD")))
     (maphash (lambda (k v)
                (multiple-value-bind (new-val changed)
-                   (parse-entry (intern (string-upcase	k) kw)
+                   (parse-entry (intern (string-upcase  k) kw)
                                 v)
                  (when changed
                    (setf (gethash k table) new-val))))
@@ -660,33 +660,34 @@ if a conversion took place."
   "Pass in a list of symbols in strings; get a list of a-lists out.
 Useful if YQL bails on us"
 
-  (when (listp symbol-or-symbol-list)
-    (error "Drakma and Yahoo don't want to talk if there are multiple
-    symbols in the list. I probably have to encode it more correctly"))
+  (let*
+      ((columnnames
+        (mapcar #'car
+                *columns*))
+       (columnlist
+        (format nil "~{~a~}"
+                (mapcar #'cdr
+                        *columns*)))
+       (gathered-symbol-list
+        (format nil "~{~a~^+~}"
+                (alexandria:ensure-list symbol-or-symbol-list)))
+       (rows
+        (cl-csv:read-csv
+         (babel:octets-to-string
+          (drakma:http-request
+           "http://finance.yahoo.com/d/quotes.csv"
+           :method :get
+           :parameters
+           (list* (cons "s" gathered-symbol-list)
+                  (cons "f" columnlist)
+                  '(("e" . ".csv"))))))))
 
-  (flet ((columnnames ()
-           (mapcar #'car
-                   *columns*))
-         (columnlist ()
-           (format nil "~{~a~}"
-                   (mapcar #'cdr
-                           *columns*))))
-    (let*
-        ((symbol-list (alexandria:ensure-list symbol-or-symbol-list))
-         (gathered-symbol-list (format nil "~{~a~^+~}" symbol-list))
-         (rows
-           (cl-csv:read-csv
-            (babel:octets-to-string
-             (drakma:http-request
-              "http://finance.yahoo.com/d/quotes.csv"
-              :method :get
-              :parameters
-              (list* (cons "s" gathered-symbol-list)
-                     (cons "f" (columnlist))
-                     '(("e" . ".csv"))))))))
-
-      ;; Create the alist(s)
-      (loop for row in rows
-            collect (map 'list (lambda (key value)
-                                 (cons key (parse-entry key value)))
-                         (columnnames) row)))))
+    ;; Create the alist(s)
+    (loop for row in rows
+       collect
+         (let ((hash (make-hash-table)))
+           (map 'list #'(lambda (key value)
+                          (setf (gethash key hash)
+                                (parse-entry key value)))
+                columnnames row)
+           hash))))
