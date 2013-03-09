@@ -309,41 +309,44 @@ S-Expression."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-company-info (symbol-list
-                                  &key ((proxy *proxy*) *proxy*))
+                                  &key (proxy *proxy*))
   "Reads the current company info and returns it as an a-list"
   (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
     (mapcar
      #'convert-stringy-table-to-keyword
      (alexandria:ensure-list
       (yason-quant-parse
-       (request-yql-quant-info list-of-symbols))))))
+       (with-proxy (proxy)
+         (request-yql-quant-info list-of-symbols)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun read-current-options (symbol-list &key ((proxy *proxy*) *proxy*))
+(defun read-current-options (symbol-list &key (proxy *proxy*))
   "Takes one or more symbols and returns a list of option hash tables.
 
 See yason-stock-options-parse for details on the data structure."
   (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
     (yason-stock-options-parse
-     (request-yql-options-info list-of-symbols))))
+     (with-proxy (proxy)
+       (request-yql-options-info list-of-symbols)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Historical data URL
 (defun read-historical-data (symbol-string start-date end-date
                              &key
-                             (historical-type :daily)
-                             ((proxy *proxy*) *proxy*))
+                               (historical-type :daily)
+                               (proxy *proxy*))
 
   "Start and end dates are 3-element lists mm/dd/yy
   Returns a list of hash tables. Keys are:
   Date Open High Low Close Volume Adj-Close"
   (let ((rows
-         (request-csv-historical-stock
-          symbol-string
-          "http://ichart.finance.yahoo.com/table.csv"
-          historical-type
-          start-date end-date)))
+         (with-proxy (proxy)
+           (request-csv-historical-stock
+            symbol-string
+            "http://ichart.finance.yahoo.com/table.csv"
+            historical-type
+            start-date end-date))))
 
     (convert-from-column-strings
      (append (list (first rows))
@@ -356,16 +359,17 @@ See yason-stock-options-parse for details on the data structure."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-historical-splits (symbol-string start-date end-date
                                &key
-                               ((proxy *proxy*) *proxy*))
+                                 (proxy *proxy*))
   "Start and end dates are 3-element lists mm/dd/yy
   Returns a list of hash tables. Keys are:
   Date Split"
   (let ((rows
-         (request-csv-historical-stock
-          symbol-string
-          "http://ichart.finance.yahoo.com/x"
-          :dividends_only
-          start-date end-date)))
+         (with-proxy (proxy)
+           (request-csv-historical-stock
+           symbol-string
+           "http://ichart.finance.yahoo.com/x"
+           :dividends_only
+           start-date end-date))))
 
     (convert-from-column-strings
      (append '(("Date" "Split"))
@@ -636,23 +640,11 @@ if a conversion took place."
              table)
     table))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun build-yahoo-query (symbol-list)
-  "Build the URL to get the info for `symbol-list`"
-  (flet ()
-
-    (let ((result
-            (format nil
-                    symbol-list
-                    (columnlist))))
-    (when *debug*
-      (format t "~a" result))
-      result)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-data-from-csv (symbol-or-symbol-list
                                    &key
-                                     ((proxy *proxy*) *proxy*))
+                                     (proxy *proxy*))
   "Pass in a list of symbols in strings; get a list of a-lists out.
 Useful if YQL bails on us"
 
@@ -677,7 +669,7 @@ Useful if YQL bails on us"
            (list* (cons "s" gathered-symbol-list)
                   (cons "f" columnlist)
                   '(("e" . ".csv")))
-           :proxy *proxy*)))))
+           :proxy proxy)))))
 
     ;; Create the alist(s)
     (loop for row in rows
@@ -690,7 +682,9 @@ Useful if YQL bails on us"
            hash))))
 
 
-(defun read-current-data (symbol-or-symbol-list &key ((proxy *proxy*) *proxy*))
+(defun read-current-data (symbol-or-symbol-list
+                          &key
+                            (proxy *proxy*))
   "Returns a list of hash tables"
   (read-current-data-from-csv symbol-or-symbol-list
                               :proxy proxy))
