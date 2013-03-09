@@ -306,12 +306,6 @@ S-Expression."
     newtable))
 
 
-(defun read-current-data (symbol-list &key ((proxy *proxy*) *proxy*))
-  "Returns a list of hash tables"
-  (let ((list-of-symbols (alexandria:ensure-list symbol-list)))
-     (alexandria:ensure-list
-      (yason-stock-quotes-parse
-       (request-yql-stock-info list-of-symbols)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-current-company-info (symbol-list
@@ -656,7 +650,9 @@ if a conversion took place."
       result)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun read-current-data-from-csv (symbol-or-symbol-list)
+(defun read-current-data-from-csv (symbol-or-symbol-list
+                                   &key
+                                     ((proxy *proxy*) *proxy*))
   "Pass in a list of symbols in strings; get a list of a-lists out.
 Useful if YQL bails on us"
 
@@ -680,7 +676,8 @@ Useful if YQL bails on us"
            :parameters
            (list* (cons "s" gathered-symbol-list)
                   (cons "f" columnlist)
-                  '(("e" . ".csv"))))))))
+                  '(("e" . ".csv")))
+           :proxy *proxy*)))))
 
     ;; Create the alist(s)
     (loop for row in rows
@@ -691,3 +688,9 @@ Useful if YQL bails on us"
                                 (parse-entry key value)))
                 columnnames row)
            hash))))
+
+
+(defun read-current-data (symbol-or-symbol-list &key ((proxy *proxy*) *proxy*))
+  "Returns a list of hash tables"
+  (read-current-data-from-csv symbol-or-symbol-list
+                              :proxy proxy))
